@@ -1,8 +1,12 @@
 ﻿using AutoMapper;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -21,12 +25,14 @@ namespace Todo.Controllers
         private readonly TodoContext _todoContext;
         private readonly TodoListService _todoListService;
         private readonly IMapper _iMapper;
+        private readonly IWebHostEnvironment _env;
 
-        public TodoController(TodoContext todoContext, IMapper iMapper, TodoListService todoListService)
+        public TodoController(TodoContext todoContext, IMapper iMapper, TodoListService todoListService, IWebHostEnvironment env)
         {
             _todoContext = todoContext;
             _iMapper = iMapper;
             _todoListService = todoListService;
+            _env = env;
         }
 
         // GET: api/<TodoController>
@@ -75,6 +81,63 @@ namespace Todo.Controllers
             {
                 return StatusCode(500);
             }
+        }
+
+        [HttpPost("PostUpFile")]
+        public IActionResult PostUpFile(List<IFormFile> files, [FromForm][ModelBinder(BinderType = typeof(AuthorEntityBinder))] TodoListPostUpDto value)
+        {
+            var post = _iMapper.Map<TodoList>(value);
+
+            if (files.Count > 0)
+            {
+                List<UploadFile> uploads = new List<UploadFile>();
+                files.ForEach((m) =>
+                {
+                    uploads.Add(new UploadFile
+                    {
+                        Name = m.FileName,
+                        Src = m.FileName
+                    });
+                });
+
+                post.UploadFiles = uploads;
+            }
+
+            _todoContext.TodoLists.Add(post);
+
+            try
+            {
+                _todoContext.SaveChanges();
+
+                #region 處理檔案儲存
+                if (files.Count > 0)
+                {
+                    string saveDir = Path.Combine(_env.ContentRootPath, "wwwroot", "UploadFiles", post.TodoId.ToString());
+
+                    if (!Directory.Exists(saveDir))
+                    {
+                        Directory.CreateDirectory(saveDir);
+                    }
+
+                    foreach (IFormFile file in files)
+                    {
+                        string saveFile = Path.Combine(saveDir, file.FileName);
+
+                        using (var stream = System.IO.File.Create(saveFile))
+                        {
+                            file.CopyTo(stream);
+                        }
+                    }
+                }
+                #endregion
+
+                return CreatedAtAction(nameof(Get), new { id = post.TodoId }, _iMapper.Map<TodoListResponseDto>(post));
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500);
+            }
+
         }
 
         // PUT api/<TodoController>/5
@@ -134,7 +197,7 @@ namespace Todo.Controllers
         [HttpDelete("List/{ids}")]
         public IActionResult DeleteList(string ids)
         { 
-            List<Guid> TodoIds= JsonSerializer.Deserialize<List<Guid>>(ids);
+            List<Guid> TodoIds= System.Text.Json.JsonSerializer.Deserialize<List<Guid>>(ids);
 
             var result = _todoContext.TodoLists.Where(m => TodoIds.Contains(m.TodoId))
                 .Include(m => m.UpdateEmployee)
