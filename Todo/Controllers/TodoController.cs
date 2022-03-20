@@ -1,9 +1,9 @@
 ﻿using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -18,21 +18,24 @@ using Todo.Service;
 
 namespace Todo.Controllers
 {
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class TodoController : ControllerBase
     {
+        private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly TodoContext _todoContext;
         private readonly TodoListService _todoListService;
         private readonly IMapper _iMapper;
         private readonly IWebHostEnvironment _env;
 
-        public TodoController(TodoContext todoContext, IMapper iMapper, TodoListService todoListService, IWebHostEnvironment env)
+        public TodoController(TodoContext todoContext, IMapper iMapper, TodoListService todoListService, IWebHostEnvironment env, IHttpContextAccessor httpContextAccessor)
         {
             _todoContext = todoContext;
             _iMapper = iMapper;
             _todoListService = todoListService;
             _env = env;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         // GET: api/<TodoController>
@@ -71,6 +74,10 @@ namespace Todo.Controllers
         public IActionResult Post([FromBody] TodoListPostDto value)
         {
             var post = _iMapper.Map<TodoList>(value);
+            var claims = _httpContextAccessor.HttpContext.User.Claims;
+            post.UpdateEmployeeId = Guid.Parse(claims.Where(m => m.Type == "EmployeeId").FirstOrDefault().Value);
+            post.InsertEmployeeId = Guid.Parse(claims.Where(m => m.Type == "EmployeeId").FirstOrDefault().Value);
+
             _todoContext.TodoLists.Add(post);
             try
             {

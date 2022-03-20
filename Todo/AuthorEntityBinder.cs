@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -39,7 +40,7 @@ namespace Todo
 			try
 			{
 				//JSON用以下的Function
-				object model = Newtonsoft.Json.JsonConvert.DeserializeObject(value, bindingContext.ModelType);
+				object model = JsonConvert.DeserializeObject(value, bindingContext.ModelType);
 				bindingContext.Result = ModelBindingResult.Success(model);
 			}
 			catch
