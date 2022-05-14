@@ -57,24 +57,26 @@ namespace Todo.Helpers.Authentication
         }
 
         /// <summary>
-        /// 驗證失敗
+        /// 驗證失敗，使用者登入驗證失敗會跑這
         /// </summary>
         /// <param name="properties"></param>
         /// <returns></returns>
         public Task ChallengeAsync(AuthenticationProperties properties)
         {
-            HttpContext.Response.Redirect($"{Options.LoginPath}?{Options.ReturnUrlKey}={HttpContext.Request.Path}");
+            HttpContext.Response.Redirect(Options.LoginPath);
             return Task.CompletedTask;
         }
 
         /// <summary>
-        /// 禁止訪問
+        /// 禁止訪問，沒有權限(Roles)的會跑這裡
         /// </summary>
         /// <param name="properties"></param>
         /// <returns></returns>
-        public async Task ForbidAsync(AuthenticationProperties properties)
+        public Task ForbidAsync(AuthenticationProperties properties)
         {
-            await HttpContext.ForbidAsync(Scheme.Name);
+            //跳轉到沒有權限的頁面
+            HttpContext.Response.Redirect(Options.ReturnUrlKey);
+            return Task.CompletedTask;
         }
 
         /// <summary>

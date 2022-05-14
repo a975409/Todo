@@ -18,7 +18,7 @@ using Todo.Service;
 
 namespace Todo.Controllers
 {
-    [Authorize("demo2")]//額外指定授權策略
+    [Authorize("demo2",Roles = "automapper")]//額外指定授權策略
     [Route("api/[controller]")]
     [ApiController]
     public class TodoController : ControllerBase
