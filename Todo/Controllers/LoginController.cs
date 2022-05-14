@@ -25,12 +25,10 @@ namespace Todo.Controllers
     [ApiController]
     public class LoginController : ControllerBase
     {
-        private readonly IConfiguration _configuration;
         private readonly TodoContext _todoContext;
 
-        public LoginController(TodoContext todoContext, IConfiguration configuration) {
+        public LoginController(TodoContext todoContext) {
             _todoContext = todoContext;
-            _configuration = configuration;
         }
 
         [HttpPost]
@@ -41,20 +39,23 @@ namespace Todo.Controllers
             if (result == null)
                 return StatusCode(302, "登入失敗，帳號密碼錯誤");
 
+            //塞入使用者資訊
             var claims = new List<Claim> {
                              new Claim(ClaimTypes.Name,result.Account),//使用者名稱
                              new Claim("FullName",result.Name),
                              new Claim("EmployeeId",result.EmployeeId.ToString())
                             };
 
-            //新增權限
+            //取得權限(Roles)
             var Roles = _todoContext.Roles.Where(m => m.EmployeeId == result.EmployeeId);
 
+            //新增權限(Roles)
             foreach (var role in Roles)
             {
                 claims.Add(new Claim(ClaimTypes.Role, role.Name));
             }
 
+            // 要注意指定驗證方案
             var claimsIdentity = new ClaimsIdentity(claims, TestAuthenticationHandler.TEST_SCHEM_NAME);
             await HttpContext.SignInAsync(TestAuthenticationHandler.TEST_SCHEM_NAME, new ClaimsPrincipal(claimsIdentity));
             return Ok("登入成功");
@@ -63,6 +64,7 @@ namespace Todo.Controllers
         [HttpDelete]
         public async Task<IActionResult> Logout()
         {
+            // 要注意指定驗證方案
             await HttpContext.SignOutAsync(TestAuthenticationHandler.TEST_SCHEM_NAME);
             return Ok("已登出");
         }
