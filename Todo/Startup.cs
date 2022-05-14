@@ -18,6 +18,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Todo.Dto;
+using Todo.Helpers;
+using Todo.Helpers.Authentication;
 using Todo.Models;
 using Todo.Service;
 
@@ -44,33 +47,52 @@ namespace Todo
             services.AddDbContext<TodoContext>(options => options.UseSqlServer(Configuration.GetConnectionString("TodoDatabase")));
             services.AddAutoMapper(typeof(Startup));
             services.AddScoped(typeof(TodoListService));
+
+            //取得使用者資訊會用到
             services.AddHttpContextAccessor();
-            services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(option =>
+
+            //啟用Session功能
+            services.AddSession(options =>
             {
-                //未登入時會自動導到這個網址
-                option.LoginPath = new PathString("/api/Login/NoLogin");
-                option.AccessDeniedPath = new PathString("/api/Login/NoAccess");
+                options.IdleTimeout = TimeSpan.FromMinutes(5);
+                //options.Cookie.SecurePolicy = CookieSecurePolicy.None;
+                //options.Cookie.HttpOnly = true;
+                //options.Cookie.IsEssential = true;
+                options.Cookie.Name = "session.user";
             });
 
+            //將Session放置到伺服器的內建記憶體
+            services.AddDistributedMemoryCache();
+
+            services.AddOptions<TestAuthenticationOptions>();
+
+            // 新增驗證功能
+            services.AddAuthentication(option =>
+            {
+                // 新增我們自定義的驗證方案名
+                option.AddScheme<TestAuthenticationHandler>(TestAuthenticationHandler.TEST_SCHEM_NAME, null);
+            });
+
+            // 新增授權功能
+            services.AddAuthorization(option =>
+            {
+                option.AddPolicy("demo2", c =>
+                {
+                    // 與我們前面定義的驗證方案繫結
+                    // 授權過程跟隨該驗證後發生
+                    c.AddAuthenticationSchemes(TestAuthenticationHandler.TEST_SCHEM_NAME);
+
+                    // 要求存在已登入使用者的標識
+                    c.RequireAuthenticatedUser();
+                });
+            });
+
+            
             services.AddMvc(options =>
             {
+                //所有controller都要驗證
                 options.Filters.Add(new AuthorizeFilter());
             });
-
-            services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-                .AddJwtBearer(options =>
-                {
-                    options.TokenValidationParameters = new TokenValidationParameters
-                    {
-                        ValidateIssuer = true,
-                        ValidIssuer = Configuration["Jwt:Issuer"],
-                        ValidateAudience = true,
-                        ValidAudience = Configuration["Jwt:Audience"],
-                        ValidateLifetime = true,//逾期後是否要將其登出
-                        ClockSkew= TimeSpan.Zero,//設定登入狀態逾期後的緩衝時間
-                        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Configuration["JWT:KEY"]))
-                    };
-                });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -87,7 +109,8 @@ namespace Todo
 
             app.UseRouting();
             app.UseStaticFiles();
-            app.UseCookiePolicy();
+            //app.UseCookiePolicy();
+            app.UseSession();
             app.UseAuthentication();
             app.UseAuthorization();
 

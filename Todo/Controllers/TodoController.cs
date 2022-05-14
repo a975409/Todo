@@ -18,7 +18,7 @@ using Todo.Service;
 
 namespace Todo.Controllers
 {
-    [Authorize]
+    [Authorize("demo2")]
     [Route("api/[controller]")]
     [ApiController]
     public class TodoController : ControllerBase
