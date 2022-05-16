@@ -18,7 +18,7 @@ using Todo.Service;
 
 namespace Todo.Controllers
 {
-    [Authorize("demo2",Roles = "automapper")]//額外指定授權策略
+    [Authorize("demo2")]//額外指定授權策略
     [Route("api/[controller]")]
     [ApiController]
     public class TodoController : ControllerBase
@@ -39,6 +39,7 @@ namespace Todo.Controllers
         }
 
         // GET: api/<TodoController>
+        [Authorize("demo2",Roles = "select")]
         [HttpGet]
         public IActionResult Get([FromQuery] TodoListSearchDto searchDto)
         {
@@ -51,6 +52,7 @@ namespace Todo.Controllers
         }
 
         // GET api/<TodoController>/5
+        [Authorize("demo2", Roles = "automapper")]
         [HttpGet("{id}")]
         public IActionResult Get(Guid id)
         {

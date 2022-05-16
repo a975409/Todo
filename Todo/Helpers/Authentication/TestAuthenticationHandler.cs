@@ -5,6 +5,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
+using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Todo.Models;
 
@@ -26,7 +28,7 @@ namespace Todo.Helpers.Authentication
         public AuthenticationScheme Scheme { get; private set; }
 
         /// <summary>
-        /// 驗證過程
+        /// 驗證過程，主要是檢查Session是否有存放任何Key
         /// </summary>
         /// <returns>驗證結果</returns>
         public Task<AuthenticateResult> AuthenticateAsync()
@@ -36,19 +38,22 @@ namespace Todo.Helpers.Authentication
                 return Task.FromResult(AuthenticateResult.Fail("驗證方案不匹配"));
             }
 
-            if (!HttpContext.Session.Keys.Contains(Options.SessionKeyName))
+            if (!HttpContext.Session.Keys.Any())
             {
                 return Task.FromResult(AuthenticateResult.Fail("Session無效"));
             }
 
             #region 驗證通過
 
-            //獲取使用者名稱
-            string un = HttpContext.Session.GetString(Options.SessionKeyName) ?? string.Empty;
+            //要注意指定驗證方案
+            ClaimsIdentity id = new ClaimsIdentity(TEST_SCHEM_NAME);
 
-            //建立使用者資訊
-            var claims = new List<Claim> { new Claim(ClaimTypes.Name, un) };
-            ClaimsIdentity id = new ClaimsIdentity(claims, TEST_SCHEM_NAME);
+            //從Session獲取使用者資訊
+            foreach (var key in HttpContext.Session.Keys)
+            {
+                id.AddClaim(new Claim(key, HttpContext.Session.GetString(key)));
+            }
+
             ClaimsPrincipal prcp = new ClaimsPrincipal(id);
             AuthenticationTicket ticket = new AuthenticationTicket(prcp, TEST_SCHEM_NAME);
             return Task.FromResult(AuthenticateResult.Success(ticket));
@@ -100,12 +105,10 @@ namespace Todo.Helpers.Authentication
         /// <returns></returns>
         public Task SignInAsync(ClaimsPrincipal user, AuthenticationProperties properties)
         {
-            //獲取使用者名稱
-            string uname = user.Identity?.Name ?? string.Empty;
-
-            if (!string.IsNullOrEmpty(uname))
+            //將在LoginController的Login設定的使用者資訊(Claims)，都存到session裡面，之後每次的Request只要從Session取出使用者資訊就行
+            foreach (var claim in user.Claims)
             {
-                HttpContext.Session.SetString(Options.SessionKeyName, uname);
+                HttpContext.Session.SetString(claim.Type, claim.Value);
             }
 
             return Task.CompletedTask;
@@ -118,10 +121,12 @@ namespace Todo.Helpers.Authentication
         /// <returns></returns>
         public Task SignOutAsync(AuthenticationProperties properties)
         {
-            if (HttpContext.Session.Keys.Contains(Options.SessionKeyName))
+            //移除存在Session裡面所有使用者資訊
+            foreach (var key in HttpContext.Session.Keys)
             {
-                HttpContext.Session.Remove(Options.SessionKeyName);
+                HttpContext.Session.Remove(key);
             }
+
             return Task.CompletedTask;
         }
     }
